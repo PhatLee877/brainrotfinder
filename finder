@@ -1,0 +1,228 @@
+-- ================== SETUP ==================
+repeat task.wait() until game:IsLoaded()
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local placeId = game.PlaceId
+
+-- ================== CONFIG ==================
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1458661734041522178/iQud8T27bN4dC515O6NEQ51SkKz8gv8R__B-g5GnmJAt1idjnX9Kct7DRiOD0FItojUW"
+local PRICE_LIMIT = 1_000_000
+local MAX_DISTANCE = 5
+
+-- ================== DEBUG ==================
+local function debugPrint(...)
+	print("[BRAINROT FINDER]", ...)
+end
+
+-- ================== PARSE GENERATION ==================
+local function parseGeneration(text)
+	if not text then return 0 end
+	local num = tonumber(text:match("[%d%.]+")) or 0
+	if text:find("K") then
+		num *= 1e3
+	elseif text:find("M") then
+		num *= 1e6
+	end
+	return num
+end
+
+-- ================== WORLD POSITION ==================
+local function getInstanceWorldPos(inst)
+	if inst:IsA("BasePart") then
+		return inst.Position
+	end
+	if inst:IsA("Model") then
+		if inst.PrimaryPart then
+			return inst.PrimaryPart.Position
+		else
+			return inst:GetPivot().Position
+		end
+	end
+end
+
+-- ================== GET BASE NAME ==================
+local function getBaseNameFromPlot(plot)
+	local sign =
+		plot:FindFirstChild("PlotSign")
+		and plot.PlotSign:FindFirstChild("SurfaceGui")
+		and plot.PlotSign.SurfaceGui:FindFirstChild("Frame")
+		and plot.PlotSign.SurfaceGui.Frame:FindFirstChild("TextLabel")
+
+	if sign then
+		return sign.Text
+	end
+	return "Unknown Base"
+end
+
+-- ================== COLLECT BRAINROT ==================
+local function collectBrainrot()
+	local found = {}
+	local plots = Workspace:FindFirstChild("Plots")
+	local debrisFolder = Workspace:FindFirstChild("Debris")
+
+	if not plots or not debrisFolder then
+		debugPrint("❌ Missing Plots or Debris")
+		return found
+	end
+
+	for _, plot in ipairs(plots:GetChildren()) do
+		debugPrint("🔎 Scanning plot:", plot.Name)
+		local baseName = getBaseNameFromPlot(plot)
+
+		local podiums = plot:FindFirstChild("AnimalPodiums")
+		if not podiums then continue end
+
+		for _, podium in ipairs(podiums:GetChildren()) do
+			local att =
+				podium:FindFirstChild("Base")
+				and podium.Base:FindFirstChild("Spawn")
+				and podium.Base.Spawn:FindFirstChild("Attachment")
+
+			if not att then continue end
+			local attPos = att.WorldPosition
+
+			local nearest, nearestDist
+
+			for _, debris in ipairs(debrisFolder:GetChildren()) do
+				local overhead = debris:FindFirstChild("AnimalOverhead")
+				if not overhead then continue end
+
+				local nameLabel = overhead:FindFirstChild("DisplayName")
+				local genLabel  = overhead:FindFirstChild("Generation")
+				if not nameLabel or not genLabel then continue end
+
+				local debrisPos = getInstanceWorldPos(debris)
+				if not debrisPos then continue end
+
+				local dist = (debrisPos - attPos).Magnitude
+				if dist <= MAX_DISTANCE and (not nearestDist or dist < nearestDist) then
+					nearestDist = dist
+					nearest = {
+						name = nameLabel.Text,
+						genText = genLabel.Text,
+						genValue = parseGeneration(genLabel.Text),
+						baseName = baseName
+					}
+				end
+			end
+
+			if nearest then
+				debugPrint(
+					"[MATCH]",
+					nearest.name,
+					nearest.genText,
+					"=>",
+					nearest.genValue,
+					"| Base:",
+					nearest.baseName
+				)
+
+				if nearest.genValue >= PRICE_LIMIT then
+					table.insert(
+						found,
+						string.format(
+							"%s (%s) | %s",
+							nearest.name,
+							nearest.genText,
+							nearest.baseName
+						)
+					)
+				end
+			end
+		end
+	end
+
+	return found
+end
+
+-- ================== WEBHOOK ==================
+local function sendWebhook(loot)
+	if #loot == 0 then
+		debugPrint("❌ No valid brainrot")
+		return
+	end
+
+	local serverLink = ("https://kebabman.vercel.app/start?placeId=%s&gameInstanceId=%s")
+		:format(placeId, tostring(game.JobId))
+
+	local payload = {
+		content = "@everyone **BRAINROT FOUND!!!!**",
+		embeds = {{
+			title = "🧠 Brainrot Finder",
+			color = 16711680,
+			fields = {
+				{ name = "Loot", value = table.concat(loot, "\n") },
+				{ name = "Join Server", value = ("[Click Here](%s)"):format(serverLink) }
+			}
+		}}
+	}
+
+	local req = (syn and syn.request) or http_request or (http and http.request) or request
+	if req then
+		debugPrint("📤 Sending webhook")
+		req({
+			Url = WEBHOOK_URL,
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = HttpService:JSONEncode(payload)
+		})
+	end
+end
+
+-- ================== MAIN ==================
+debugPrint("🚀 Finder started")
+
+local loot = collectBrainrot()
+sendWebhook(loot)
+
+-- ================== SERVER HOP (REAL FIX) ==================
+local function serverHop()
+	debugPrint("🔁 Searching new server...")
+
+	local cursor = ""
+	for i = 1, 5 do
+		local url =
+			"https://games.roblox.com/v1/games/"
+			.. placeId
+			.. "/servers/Public?sortOrder=Asc&limit=100"
+			.. (cursor ~= "" and "&cursor=" .. cursor or "")
+
+		local success, res = pcall(function()
+			return HttpService:JSONDecode(game:HttpGet(url))
+		end)
+
+		if success and res and res.data then
+			for _, server in ipairs(res.data) do
+				if server.playing < server.maxPlayers
+					and server.id ~= game.JobId then
+
+					debugPrint("🚀 Hopping to server:", server.id)
+
+					if queue_on_teleport then
+						queue_on_teleport(game:HttpGetAsync("https://raw.githubusercontent.com/placeholder/reexec.lua"))
+					end
+
+					TeleportService:TeleportToPlaceInstance(
+						placeId,
+						server.id,
+						player
+					)
+					return
+				end
+			end
+			cursor = res.nextPageCursor or ""
+		end
+	end
+
+	debugPrint("⚠️ No server found, retrying...")
+	task.wait(3)
+	serverHop()
+end
+
+task.wait(2)
+serverHop()
