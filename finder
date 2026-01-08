@@ -210,13 +210,13 @@ end
 debugPrint("🚀 Finder started")
 
 local loot = collectBrainrot()
-sendWebhook(loot)
 
--- Thay đổi textLabel dựa vào kết quả
+-- Cập nhật textLabel dựa vào loot
 if #loot == 0 then
     textLabel.Text = "No Brainrot Found 😞"
 else
     textLabel.Text = "Webhook Sent ✅"
+    sendWebhook(loot) -- chỉ gửi webhook nếu có loot
 end
 
 -- ================== SERVER HOP (REAL FIX) ==================
