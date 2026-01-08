@@ -219,13 +219,97 @@ else
     sendWebhook(loot) -- chỉ gửi webhook nếu có loot
 end
 
--- ================== SERVER HOP (REAL FIX) ==================
-local TeleportService = game:GetService("TeleportService")
+-- LocalScript
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
 
-local player = Players.LocalPlayer
-local placeId = game.PlaceId
+local PlaceId = game.PlaceId
+local JobId = game.JobId
 
-task.wait(0.1)
-print("🔁 Server hopping (basic)")
-TeleportService:Teleport(placeId, player)
+-- Table lưu server đã ghé
+local visitedServers = {}
+
+-- Hàm server hop
+local function serverHop()
+    local servers = {}
+    local success, req = pcall(function()
+        return game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true")
+    end)
+
+    if success then
+        local body = HttpService:JSONDecode(req)
+        if body and body.data then
+            for i, v in next, body.data do
+                if type(v) == "table" 
+                   and tonumber(v.playing) and tonumber(v.maxPlayers) 
+                   and v.playing < v.maxPlayers 
+                   and v.id ~= JobId 
+                   and not table.find(visitedServers, v.id) then
+                    table.insert(servers, v.id)
+                end
+            end
+        end
+    end
+
+    if #servers > 0 then
+        local chosenServer = servers[math.random(1, #servers)]
+        table.insert(visitedServers, chosenServer) -- đánh dấu server đã ghé
+
+        -- Queue script cho server tiếp theo
+        local code = [[
+            local Players = game:GetService("Players")
+            local HttpService = game:GetService("HttpService")
+            local TeleportService = game:GetService("TeleportService")
+            local PlaceId = game.PlaceId
+            local JobId = game.JobId
+            local visitedServers = ]] .. HttpService:JSONEncode(visitedServers) .. [[
+
+            local function serverHop()
+                local servers = {}
+                local success, req = pcall(function()
+                    return game:HttpGet("https://games.roblox.com/v1/games/"..PlaceId.."/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true")
+                end)
+                if success then
+                    local body = HttpService:JSONDecode(req)
+                    if body and body.data then
+                        for i,v in next, body.data do
+                            if type(v)=="table" and tonumber(v.playing) and tonumber(v.maxPlayers)
+                               and v.playing < v.maxPlayers
+                               and v.id ~= JobId
+                               and not table.find(visitedServers,v.id) then
+                                table.insert(servers,v.id)
+                            end
+                        end
+                    end
+                end
+
+                if #servers > 0 then
+                    local chosenServer = servers[math.random(1,#servers)]
+                    table.insert(visitedServers,chosenServer)
+                    queue_on_teleport = code -- tự queue tiếp
+                    TeleportService:TeleportToPlaceInstance(PlaceId, chosenServer, Players.LocalPlayer)
+                else
+                    warn("Không còn server nào để hop.")
+                end
+            end
+
+            while true do
+                serverHop()
+                wait(1)
+            end
+        ]]
+        queue_on_teleport = code
+
+        -- Teleport
+        TeleportService:TeleportToPlaceInstance(PlaceId, chosenServer, Players.LocalPlayer)
+    else
+        warn("Không còn server nào để hop.")
+    end
+end
+
+-- Gọi server hop lần đầu
+while true do
+    serverHop()
+    wait(1)
+end
