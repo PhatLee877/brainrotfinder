@@ -212,6 +212,9 @@ debugPrint("🚀 Finder started")
 local loot = collectBrainrot()
 sendWebhook(loot)
 
+-- Thay đổi text sau khi gửi webhook
+textLabel.Text = "Webhook Sent ✅"
+
 -- ================== SERVER HOP (REAL FIX) ==================
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
