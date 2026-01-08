@@ -212,8 +212,12 @@ debugPrint("🚀 Finder started")
 local loot = collectBrainrot()
 sendWebhook(loot)
 
--- Thay đổi text sau khi gửi webhook
-textLabel.Text = "Webhook Sent ✅"
+-- Thay đổi textLabel dựa vào kết quả
+if #loot == 0 then
+    textLabel.Text = "No Brainrot Found 😞"
+else
+    textLabel.Text = "Webhook Sent ✅"
+end
 
 -- ================== SERVER HOP (REAL FIX) ==================
 local TeleportService = game:GetService("TeleportService")
