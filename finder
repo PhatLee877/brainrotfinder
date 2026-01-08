@@ -1,10 +1,3 @@
--- ===== QUEUE SCRIPT FOR NEXT SERVER =====
-if queue_on_teleport then
-	queue_on_teleport([[
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/PhatLee877/brainrotfinder/refs/heads/main/finder"))()
-	]])
-end
-
 if shared.__BRAINROT_WEBHOOK_SENT then return end
 shared.__BRAINROT_WEBHOOK_SENT = true
 -- ================== SETUP ==================
