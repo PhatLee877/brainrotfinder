@@ -188,6 +188,7 @@ local function sendWebhook(loot)
 			title = "🧠 Brainrot Finder",
 			color = 16711680,
 			fields = {
+				{ name = "Players", value = string.format("%d/8", #Players:GetPlayers()) }, 
 				{ name = "Loot", value = table.concat(loot, "\n") },
 				{ name = "Join Server", value = ("[Click Here](%s)"):format(serverLink) }
 			}
