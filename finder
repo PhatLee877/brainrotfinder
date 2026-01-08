@@ -209,32 +209,92 @@ end
 -- ================== MAIN ==================
 debugPrint("🚀 Finder started")
 
-local loot = collectBrainrot()
+local allBrainrot = {} -- tất cả brainrot tìm được
+local loot = {}         -- chỉ những brainrot đủ PRICE_LIMIT để gửi webhook
 
--- Sắp xếp loot theo giá trị Generation từ lớn xuống bé
-table.sort(loot, function(a, b)
-    -- a, b là chuỗi "Name (Gen) | Base"
-    local aGen = tonumber(a:match("%(([%d%.KM]+)%)"))
-    local bGen = tonumber(b:match("%(([%d%.KM]+)%)"))
-    if aGen and bGen then
-        return aGen > bGen
-    else
-        return false
+-- Collect brainrot
+local plots = Workspace:FindFirstChild("Plots")
+local debrisFolder = Workspace:FindFirstChild("Debris")
+
+if plots and debrisFolder then
+    for _, plot in ipairs(plots:GetChildren()) do
+        local baseName = getBaseNameFromPlot(plot)
+        local podiums = plot:FindFirstChild("AnimalPodiums")
+        if not podiums then continue end
+
+        for _, podium in ipairs(podiums:GetChildren()) do
+            local att =
+                podium:FindFirstChild("Base")
+                and podium.Base:FindFirstChild("Spawn")
+                and podium.Base.Spawn:FindFirstChild("Attachment")
+
+            if not att then continue end
+            local attPos = att.WorldPosition
+
+            local nearest, nearestDist
+
+            for _, debris in ipairs(debrisFolder:GetChildren()) do
+                local overhead = debris:FindFirstChild("AnimalOverhead")
+                if not overhead then continue end
+
+                local nameLabel = overhead:FindFirstChild("DisplayName")
+                local genLabel  = overhead:FindFirstChild("Generation")
+                if not nameLabel or not genLabel then continue end
+
+                local debrisPos = getInstanceWorldPos(debris)
+                if not debrisPos then continue end
+
+                local dist = (debrisPos - attPos).Magnitude
+                if dist <= MAX_DISTANCE and (not nearestDist or dist < nearestDist) then
+                    nearestDist = dist
+                    nearest = {
+                        name = nameLabel.Text,
+                        genText = genLabel.Text,
+                        genValue = parseGeneration(genLabel.Text),
+                        baseName = baseName
+                    }
+                end
+            end
+
+            if nearest then
+                -- Thêm tất cả brainrot vào allBrainrot
+                table.insert(
+                    allBrainrot,
+                    string.format("%s (%s) | %s", nearest.name, nearest.genText, nearest.baseName)
+                )
+
+                -- Chỉ thêm vào loot nếu đủ PRICE_LIMIT
+                if nearest.genValue >= PRICE_LIMIT then
+                    table.insert(loot, string.format("%s (%s) | %s", nearest.name, nearest.genText, nearest.baseName))
+                end
+            end
+        end
     end
+end
+
+-- ================== GUI ==================
+-- Sắp xếp allBrainrot theo giá trị từ lớn xuống bé
+table.sort(allBrainrot, function(a, b)
+    local function parseGen(text)
+        local num = tonumber(text:match("%(([%d%.KM]+)%)")) or 0
+        if text:find("K") then num = num * 1e3
+        elseif text:find("M") then num = num * 1e6
+        end
+        return num
+    end
+    return parseGen(a) > parseGen(b)
 end)
 
--- ================== GUI HIỂN THỊ DANH SÁCH ==================
--- Tạo frame chứa danh sách
+-- Tạo frame chứa danh sách brainrot
 local listFrame = Instance.new("Frame")
-listFrame.Size = UDim2.new(0, 400, 0, 0) -- height sẽ tự động tăng
-listFrame.Position = UDim2.new(0.5, -200, 0.5, 60) -- bắt đầu dưới chữ "Normal Working"
+listFrame.Size = UDim2.new(0, 400, 0, 0)
+listFrame.Position = UDim2.new(0.5, -200, 0.5, 60)
 listFrame.BackgroundTransparency = 1
 listFrame.Parent = frame
 
--- Tạo từng TextLabel cho mỗi brainrot
 local padding = 5
 local currentY = 0
-for _, item in ipairs(loot) do
+for _, item in ipairs(allBrainrot) do
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 0, 20)
     label.Position = UDim2.new(0, 0, 0, currentY)
@@ -248,13 +308,12 @@ for _, item in ipairs(loot) do
 
     currentY = currentY + 20 + padding
 end
-
--- Cập nhật height của listFrame
 listFrame.Size = UDim2.new(0, 400, 0, currentY)
 
--- Thay đổi text sau khi gửi webhook
+-- ================== GỬI WEBHOOK ==================
 sendWebhook(loot)
 textLabel.Text = "Webhook Sent ✅"
+
 -- ================== SERVER HOP (REAL FIX) ==================
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
