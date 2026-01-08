@@ -1,3 +1,9 @@
+-- ===== QUEUE SCRIPT FOR NEXT SERVER =====
+if queue_on_teleport then
+	queue_on_teleport([[
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/PhatLee877/brainrotfinder/refs/heads/main/finder"))()
+	]])
+end
 -- ================== SETUP ==================
 repeat task.wait() until game:IsLoaded()
 
@@ -181,48 +187,12 @@ local loot = collectBrainrot()
 sendWebhook(loot)
 
 -- ================== SERVER HOP (REAL FIX) ==================
-local function serverHop()
-	debugPrint("🔁 Searching new server...")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
 
-	local cursor = ""
-	for i = 1, 5 do
-		local url =
-			"https://games.roblox.com/v1/games/"
-			.. placeId
-			.. "/servers/Public?sortOrder=Asc&limit=100"
-			.. (cursor ~= "" and "&cursor=" .. cursor or "")
+local player = Players.LocalPlayer
+local placeId = game.PlaceId
 
-		local success, res = pcall(function()
-			return HttpService:JSONDecode(game:HttpGet(url))
-		end)
-
-		if success and res and res.data then
-			for _, server in ipairs(res.data) do
-				if server.playing < server.maxPlayers
-					and server.id ~= game.JobId then
-
-					debugPrint("🚀 Hopping to server:", server.id)
-
-					if queue_on_teleport then
-						queue_on_teleport(game:HttpGetAsync("https://raw.githubusercontent.com/PhatLee877/brainrotfinder/refs/heads/main/finder"))
-					end
-
-					TeleportService:TeleportToPlaceInstance(
-						placeId,
-						server.id,
-						player
-					)
-					return
-				end
-			end
-			cursor = res.nextPageCursor or ""
-		end
-	end
-
-	debugPrint("⚠️ No server found, retrying...")
-	task.wait(3)
-	serverHop()
-end
-
-task.wait(2)
-serverHop()
+task.wait(0.1)
+print("🔁 Server hopping (basic)")
+TeleportService:Teleport(placeId, player)
